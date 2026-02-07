@@ -15,7 +15,7 @@ router.get('/:tenantId', async (req, res) => {
   console.log('Headers:', req.headers);
   console.log('--------------------------------');
 
-  const { mac, ip, url, login_url, gw_address, gw_port } = req.query; // Adicionei gw_address e gw_port comuns em APs
+  const { mac, ip, url, login_url, gw_address, gw_port, continue: continueUrl, ap_mac, ssid, redirect_uri } = req.query; 
 
   try {
     const tenant = await prisma.tenant.findUnique({
@@ -30,8 +30,10 @@ router.get('/:tenantId', async (req, res) => {
       tenant,
       mac,
       ip,
-      originalUrl: url,
-      loginUrl: login_url // URL para onde postar a autenticação (se o roteador exigir)
+      originalUrl: url || continueUrl, // Intelbras usa 'continue'
+      loginUrl: login_url || redirect_uri, // Intelbras usa 'redirect_uri'
+      ssid,
+      ap_mac
     });
   } catch (error) {
     console.error(error);
@@ -79,15 +81,19 @@ router.post('/:tenantId/login', async (req, res) => {
     });
 
     // 3. Redirecionar para liberar o acesso
-    // Se o roteador enviou uma loginUrl (comum em Intelbras/Mikrotik hotspot), postamos ou redirecionamos para lá.
-    // Caso contrário, redirecionamos para a URL original ou uma página de sucesso.
-    
-    // Exemplo genérico de liberação (ajustar conforme o manual do AP 360)
-    // Muitos roteadores Intelbras esperam um POST ou GET em uma URL específica do gateway.
+    // Intelbras AP 360 espera redirecionamento para redirect_uri (itbradius.cgi)
+    // Normalmente aceita GET ou POST com username/password
     
     if (loginUrl) {
-       // Se veio o parâmetro, redireciona para ele confirmando
-       return res.redirect(`${loginUrl}?username=${mac}&password=guest`); 
+       // Se o loginUrl já tiver parâmetros, usamos &, senão ?
+       const separator = loginUrl.includes('?') ? '&' : '?';
+       
+       // Para AP 360, geralmente passamos o MAC como usuário e uma senha padrão ou vazio
+       // O importante é bater no endpoint de liberação
+       const authRedirect = `${loginUrl}${separator}username=${mac}&password=guest`;
+       
+       console.log('Redirecionando para liberação:', authRedirect);
+       return res.redirect(authRedirect); 
     }
     
     // Fallback: mostrar tela de sucesso
