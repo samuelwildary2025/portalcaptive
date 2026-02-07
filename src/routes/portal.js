@@ -81,19 +81,26 @@ router.post('/:tenantId/login', async (req, res) => {
     });
 
     // 3. Redirecionar para liberar o acesso
-    // Intelbras AP 360 espera redirecionamento para redirect_uri (itbradius.cgi)
-    // Normalmente aceita GET ou POST com username/password
+    // Intelbras AP 360 espera POST para itbcaptive.cgi
     
     if (loginUrl) {
-       // Se o loginUrl já tiver parâmetros, usamos &, senão ?
-       const separator = loginUrl.includes('?') ? '&' : '?';
+       console.log('Enviando POST para liberação:', loginUrl);
        
-       // Para AP 360, geralmente passamos o MAC como usuário e uma senha padrão ou vazio
-       // O importante é bater no endpoint de liberação
-       const authRedirect = `${loginUrl}${separator}username=${mac}&password=guest`;
-       
-       console.log('Redirecionando para liberação:', authRedirect);
-       return res.redirect(authRedirect); 
+       // Renderiza uma página que faz o POST automático
+       return res.send(`
+         <html>
+           <head><title>Autenticando...</title></head>
+           <body onload="document.getElementById('loginForm').submit()">
+             <div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
+               <p>Autenticando, aguarde...</p>
+             </div>
+             <form id="loginForm" action="${loginUrl}" method="POST">
+               <input type="hidden" name="username" value="${mac}">
+               <input type="hidden" name="password" value="guest">
+             </form>
+           </body>
+         </html>
+       `);
     }
     
     // Fallback: mostrar tela de sucesso
