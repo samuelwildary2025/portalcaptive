@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="3;url=<%= originalUrl %>">
+    <title>Conectado!</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #e8f5e9; color: #2e7d32; text-align: center; }
+        h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        p { color: #555; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #2e7d32; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="spinner"></div>
+    <h1>Conectado com Sucesso!</h1>
+    <p>Você será redirecionado para a internet em instantes...</p>
+    <p><small>Se não for redirecionado, <a href="<%= originalUrl %>">clique aqui</a>.</small></p>
+</body>
+</html>

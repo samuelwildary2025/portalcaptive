@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Admin - SaaS Captive</title>
+    <style>
+        body { font-family: sans-serif; padding: 2rem; background: #f0f2f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1, h2 { color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; }
+        .form-group { margin-bottom: 1rem; display: flex; gap: 1rem; }
+        input { padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; flex: 1; }
+        button { padding: 0.5rem 1rem; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Painel Administrativo</h1>
+        
+        <div class="stats">
+            <h2>Clientes (Tenants)</h2>
+            
+            <form action="/admin/tenants" method="POST" class="form-group" style="flex-wrap: wrap;">
+                <input type="text" name="name" placeholder="Nome do Estabelecimento" required>
+                <input type="email" name="email" placeholder="Email do Dono" required>
+                <input type="password" name="password" placeholder="Senha" required>
+                <input type="url" name="logoUrl" placeholder="URL da Logo (http://...)" style="flex-basis: 100%;">
+                <input type="text" name="portalTitle" placeholder="Título do Portal (Ex: Wi-Fi Padaria)" style="flex-basis: 100%;">
+                <button type="submit" style="flex-basis: 100%;">Criar Cliente</button>
+            </form>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>ID (Configurar no Roteador)</th>
+                        <th>Usuários Wi-Fi</th>
+                        <th>Acessos Totais</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% tenants.forEach(tenant => { %>
+                    <tr>
+                        <td><%= tenant.name %></td>
+                        <td><code><%= tenant.id %></code></td>
+                        <td><%= tenant._count.wifiUsers %></td>
+                        <td><%= tenant._count.accessLogs %></td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

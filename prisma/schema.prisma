@@ -1,0 +1,61 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Cliente SaaS (O dono do roteador/estabelecimento)
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  password    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Configurações do Portal
+  portalTitle String?  @default("Bem-vindo ao Wi-Fi")
+  logoUrl     String?  // URL da logo do estabelecimento
+  redirectUrl String?  // URL para onde o usuário vai após logar (opcional)
+  
+  wifiUsers   WifiUser[]
+  accessLogs  AccessLog[]
+}
+
+// Usuário Final (Quem conecta no Wi-Fi)
+model WifiUser {
+  id          String   @id @default(uuid())
+  macAddress  String?  // Alguns roteadores não enviam, mas é bom ter
+  whatsapp    String?  // WhatsApp do Cliente
+  email       String?  // Login por email (opcional)
+  cpf         String?  // Login por CPF (opcional)
+  createdAt   DateTime @default(now())
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  logs        AccessLog[]
+  
+  @@unique([tenantId, macAddress]) // Um MAC é único por estabelecimento
+}
+
+// Logs de Acesso (Histórico de conexões)
+model AccessLog {
+  id          String   @id @default(uuid())
+  macAddress  String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  
+  wifiUserId  String?
+  wifiUser    WifiUser? @relation(fields: [wifiUserId], references: [id])
+  
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+}
