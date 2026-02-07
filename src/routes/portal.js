@@ -44,7 +44,7 @@ router.get('/:tenantId', async (req, res) => {
 // Processar Login
 router.post('/:tenantId/login', async (req, res) => {
   const { tenantId } = req.params;
-  const { mac, email, cpf, whatsapp, loginUrl, originalUrl } = req.body;
+  const { mac, email, cpf, whatsapp, loginUrl, originalUrl, ip } = req.body;
 
   try {
     // 1. Cadastrar ou Atualizar Usuário
@@ -85,17 +85,35 @@ router.post('/:tenantId/login', async (req, res) => {
     
     if (loginUrl) {
        let finalLoginUrl = loginUrl;
+       const ip = req.body.ip;
        
-       // TENTATIVA DE CORREÇÃO DE DNS:
-       // Se tivermos o IP do gateway (req.body.ip ou req.query.ip que foi passado para a view),
-       // vamos substituir o hostname 'meucaptive.intelbras.com.br' pelo IP direto.
-       // O IP original veio na query 'ip' da rota GET, precisamos garantir que ele esteja disponível aqui.
-       // Como não persistimos o IP no form anterior (apenas na view), vou confiar que o roteador resolve,
-       // MAS se falhar, o ideal é passar o IP no form hidden da tela de login.
+       // TENTATIVA DE CORREÇÃO DE DNS E SSL:
+       // Se tivermos o IP do gateway, vamos forçar o uso dele e HTTP puro.
+       // O AP envia 'ip' na query string (ex: 10.0.0.1).
        
-       // Melhoria: Vamos extrair o IP da loginUrl se possível ou usar o originalUrl para tentar achar pistas,
-       // mas o ideal é que o form de login passasse o IP.
-       // Vou assumir que o 'loginUrl' original funciona, mas vou adicionar um botão visível para o usuário.
+       if (ip) {
+           // Substitui qualquer protocolo e domínio pelo IP do gateway em HTTP
+           // Ex: https://meucaptive.intelbras.com.br:2061/... -> http://10.0.0.1:2061/...
+           
+           try {
+               // Tenta fazer parse da URL original para manter path e query
+               const urlObj = new URL(loginUrl);
+               
+               // Se a URL original for HTTPS, mudamos para HTTP para evitar erro de certificado auto-assinado
+               const protocol = 'http:';
+               
+               // Mantém a porta se existir, senão usa padrão (mas o AP costuma mandar 2061)
+               const port = urlObj.port ? `:${urlObj.port}` : '';
+               
+               // Reconstrói a URL usando o IP
+               finalLoginUrl = `${protocol}//${ip}${port}${urlObj.pathname}${urlObj.search}`;
+               
+               console.log('URL de liberação reescrita (DNS/SSL Fix):', finalLoginUrl);
+           } catch (e) {
+               console.error('Erro ao reescrever URL:', e);
+               // Se der erro no parse, mantém a original
+           }
+       }
        
        console.log('Enviando POST para liberação:', finalLoginUrl);
        
