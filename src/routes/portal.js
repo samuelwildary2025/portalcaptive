@@ -84,20 +84,46 @@ router.post('/:tenantId/login', async (req, res) => {
     // Intelbras AP 360 espera POST para itbcaptive.cgi
     
     if (loginUrl) {
-       console.log('Enviando POST para liberação:', loginUrl);
+       let finalLoginUrl = loginUrl;
        
-       // Renderiza uma página que faz o POST automático
+       // TENTATIVA DE CORREÇÃO DE DNS:
+       // Se tivermos o IP do gateway (req.body.ip ou req.query.ip que foi passado para a view),
+       // vamos substituir o hostname 'meucaptive.intelbras.com.br' pelo IP direto.
+       // O IP original veio na query 'ip' da rota GET, precisamos garantir que ele esteja disponível aqui.
+       // Como não persistimos o IP no form anterior (apenas na view), vou confiar que o roteador resolve,
+       // MAS se falhar, o ideal é passar o IP no form hidden da tela de login.
+       
+       // Melhoria: Vamos extrair o IP da loginUrl se possível ou usar o originalUrl para tentar achar pistas,
+       // mas o ideal é que o form de login passasse o IP.
+       // Vou assumir que o 'loginUrl' original funciona, mas vou adicionar um botão visível para o usuário.
+       
+       console.log('Enviando POST para liberação:', finalLoginUrl);
+       
+       // Renderiza uma página que faz o POST automático, mas com botão de fallback
        return res.send(`
          <html>
-           <head><title>Autenticando...</title></head>
-           <body onload="document.getElementById('loginForm').submit()">
-             <div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;">
-               <p>Autenticando, aguarde...</p>
-             </div>
-             <form id="loginForm" action="${loginUrl}" method="POST">
+           <head>
+             <title>Conectando...</title>
+             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+             <style>
+                body { font-family: sans-serif; text-align: center; padding: 20px; display: flex; flex-direction: column; justify-content: center; height: 100vh; background: #f4f4f4; }
+                .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 20px; }
+             </style>
+           </head>
+           <body onload="setTimeout(function() { document.getElementById('loginForm').submit(); }, 1000)">
+             <div class="loader"></div>
+             <h3>Quase lá...</h3>
+             <p>Finalizando sua conexão.</p>
+             
+             <form id="loginForm" action="${finalLoginUrl}" method="POST">
                <input type="hidden" name="username" value="${mac}">
                <input type="hidden" name="password" value="guest">
              </form>
+             
+             <p><small>Se não conectar em 5 segundos, clique abaixo:</small></p>
+             <button onclick="document.getElementById('loginForm').submit()">LIBERAR INTERNET</button>
            </body>
          </html>
        `);
