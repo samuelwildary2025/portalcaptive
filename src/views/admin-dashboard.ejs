@@ -37,6 +37,7 @@
                     <tr>
                         <th>Nome</th>
                         <th>ID (Configurar no Roteador)</th>
+                        <th>Link do Portal</th>
                         <th>Usuários Wi-Fi</th>
                         <th>Acessos Totais</th>
                     </tr>
@@ -46,6 +47,11 @@
                     <tr>
                         <td><%= tenant.name %></td>
                         <td><code><%= tenant.id %></code></td>
+                        <td>
+                            <button onclick="copyLink('<%= tenant.id %>')" style="background: #007bff; font-size: 0.8rem; padding: 0.3rem 0.6rem;">
+                                Copiar Link
+                            </button>
+                        </td>
                         <td><%= tenant._count.wifiUsers %></td>
                         <td><%= tenant._count.accessLogs %></td>
                     </tr>
@@ -54,5 +60,17 @@
             </table>
         </div>
     </div>
+
+    <script>
+        function copyLink(tenantId) {
+            const url = `${window.location.origin}/portal/${tenantId}`;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Link copiado: ' + url);
+            }).catch(err => {
+                console.error('Erro ao copiar', err);
+                prompt('Copie o link manualmente:', url);
+            });
+        }
+    </script>
 </body>
 </html>

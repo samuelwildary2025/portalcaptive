@@ -7,7 +7,15 @@ const prisma = new PrismaClient();
 // O roteador redireciona para cá: /portal/:tenantId?mac=...&ip=...&url=...
 router.get('/:tenantId', async (req, res) => {
   const { tenantId } = req.params;
-  const { mac, ip, url, login_url } = req.query; // Parâmetros comuns de roteadores
+  
+  // LOG DE DEBUG PARA AP 360
+  console.log('--- NOVA CONEXÃO DE ROTEADOR ---');
+  console.log('Tenant ID:', tenantId);
+  console.log('Query Params recebidos:', req.query);
+  console.log('Headers:', req.headers);
+  console.log('--------------------------------');
+
+  const { mac, ip, url, login_url, gw_address, gw_port } = req.query; // Adicionei gw_address e gw_port comuns em APs
 
   try {
     const tenant = await prisma.tenant.findUnique({
