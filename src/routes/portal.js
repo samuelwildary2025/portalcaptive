@@ -57,7 +57,31 @@ router.get('/:tenantId', async (req, res) => {
 // Processar Login
 router.post('/:tenantId/login', async (req, res) => {
   const { tenantId } = req.params;
-  const { mac, email, cpf, whatsapp, loginUrl, originalUrl, ip, user_hash, ts } = req.body;
+  const { mac, email, cpf, whatsapp, senha, loginUrl, originalUrl, ip, user_hash, ts } = req.body;
+
+  // Validar senha contra variável de ambiente
+  const portalPassword = process.env.PORTAL_PASSWORD;
+  if (portalPassword && senha !== portalPassword) {
+    try {
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) return res.status(404).send('Estabelecimento não encontrado.');
+      return res.render('portal-login', {
+        tenant,
+        mac,
+        ip,
+        user_hash,
+        ts,
+        originalUrl,
+        loginUrl,
+        ssid: req.body.ssid || '',
+        ap_mac: req.body.ap_mac || '',
+        error: 'Senha incorreta. Tente novamente.'
+      });
+    } catch (err) {
+      console.error('Erro ao validar senha:', err);
+      return res.status(500).send('Erro interno.');
+    }
+  }
 
   try {
     // 1. Cadastrar ou Atualizar Usuário
