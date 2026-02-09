@@ -7,23 +7,32 @@ const prisma = new PrismaClient();
 // O roteador redireciona para cá: /portal/:tenantId?mac=...&ip=...&url=...
 router.get('/:tenantId', async (req, res) => {
   const { tenantId } = req.params;
-  
+  const start = Date.now(); // Início da medição de tempo
+
   // LOG DE DEBUG PARA AP 360
+  console.log(`[PERFORMANCE] Início requisição tenant: ${tenantId}`);
   console.log('--- NOVA CONEXÃO DE ROTEADOR ---');
   console.log('Tenant ID:', tenantId);
   console.log('Query Params recebidos:', req.query);
   console.log('Headers:', req.headers);
   console.log('--------------------------------');
 
-  const { mac, ip, url, login_url, gw_address, gw_port, continue: continueUrl, ap_mac, ssid, redirect_uri, user_hash, ts } = req.query; 
+  const { mac, ip, url, login_url, gw_address, gw_port, continue: continueUrl, ap_mac, ssid, redirect_uri, user_hash, ts } = req.query;
 
   try {
+    const dbStart = Date.now();
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId }
     });
+    console.log(`[PERFORMANCE] Tempo consulta DB (Tenant): ${Date.now() - dbStart}ms`);
 
     if (!tenant) {
+      console.log(`[PERFORMANCE] Tenant não encontrado. Tempo total: ${Date.now() - start}ms`);
       return res.status(404).send('Estabelecimento não encontrado.');
+    }
+
+    if (tenant.logoUrl) {
+      console.log(`[DEBUG] Logo URL: ${tenant.logoUrl}`);
     }
 
     res.render('portal-login', {
@@ -32,13 +41,15 @@ router.get('/:tenantId', async (req, res) => {
       ip,
       user_hash, // Passando user_hash para a view (Obrigatório para Intelbras)
       ts,        // Passando timestamp para a view
-      originalUrl: url || continueUrl, 
+      originalUrl: url || continueUrl,
       loginUrl: login_url || redirect_uri,
       ssid,
       ap_mac
     });
+    console.log(`[PERFORMANCE] Requisição finalizada com sucesso. Tempo total: ${Date.now() - start}ms`);
+
   } catch (error) {
-    console.error(error);
+    console.error(`[PERFORMANCE] Erro após ${Date.now() - start}ms:`, error);
     res.status(500).send('Erro interno.');
   }
 });
@@ -65,11 +76,11 @@ router.post('/:tenantId/login', async (req, res) => {
         }
       });
     } else {
-        // Atualiza dados se mudaram
-        await prisma.wifiUser.update({
-            where: { id: user.id },
-            data: { email, cpf, whatsapp }
-        });
+      // Atualiza dados se mudaram
+      await prisma.wifiUser.update({
+        where: { id: user.id },
+        data: { email, cpf, whatsapp }
+      });
     }
 
     // 2. Registrar Log de Acesso
@@ -84,38 +95,38 @@ router.post('/:tenantId/login', async (req, res) => {
 
     // 3. Redirecionar para liberar o acesso (MÉTODO INTELBRAS - Conforme documentação Zeus OS)
     // Usar GET redirect para o redirect_uri original com parâmetros na query string
-    
+
     if (loginUrl) {
-       console.log('=== LIBERAÇÃO INTELBRAS ===');
-       console.log('redirect_uri original:', loginUrl);
-       console.log('user_hash:', user_hash);
-       console.log('ts:', ts);
-       
-       // Construir parâmetros conforme especificação (página 8-9 do PDF)
-       const session_timeout = 3600;  // 1 hora
-       const idle_timeout = 600;      // 10 min ocioso
-       const continueUrl = originalUrl || 'http://www.google.com';
-       
-       // Construir URL final com parâmetros (GET redirect, não POST)
-       const params = new URLSearchParams({
-         continue: continueUrl,
-         ts: ts,
-         user_hash: user_hash,
-         session_timeout: session_timeout.toString(),
-         idle_timeout: idle_timeout.toString()
-       });
-       
-       // Usar o redirect_uri ORIGINAL - NÃO reescrever para IP local!
-       // O DNS meucaptive.intelbras.com.br resolve para o IP do roteador na rede do cliente
-       const finalUrl = `${loginUrl}?${params.toString()}`;
-       
-       console.log('URL final de liberação:', finalUrl);
-       console.log('===========================');
-       
-       // Redirect GET conforme documentação Intelbras
-       return res.redirect(finalUrl);
-     }
-    
+      console.log('=== LIBERAÇÃO INTELBRAS ===');
+      console.log('redirect_uri original:', loginUrl);
+      console.log('user_hash:', user_hash);
+      console.log('ts:', ts);
+
+      // Construir parâmetros conforme especificação (página 8-9 do PDF)
+      const session_timeout = 3600;  // 1 hora
+      const idle_timeout = 600;      // 10 min ocioso
+      const continueUrl = originalUrl || 'http://www.google.com';
+
+      // Construir URL final com parâmetros (GET redirect, não POST)
+      const params = new URLSearchParams({
+        continue: continueUrl,
+        ts: ts,
+        user_hash: user_hash,
+        session_timeout: session_timeout.toString(),
+        idle_timeout: idle_timeout.toString()
+      });
+
+      // Usar o redirect_uri ORIGINAL - NÃO reescrever para IP local!
+      // O DNS meucaptive.intelbras.com.br resolve para o IP do roteador na rede do cliente
+      const finalUrl = `${loginUrl}?${params.toString()}`;
+
+      console.log('URL final de liberação:', finalUrl);
+      console.log('===========================');
+
+      // Redirect GET conforme documentação Intelbras
+      return res.redirect(finalUrl);
+    }
+
     // Fallback: mostrar tela de sucesso
     res.render('portal-success', { originalUrl: originalUrl || 'https://google.com' });
 
