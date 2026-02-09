@@ -4,8 +4,10 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 // Dashboard Admin
+// Dashboard Admin
 router.get('/', async (req, res) => {
   try {
+    console.log('Tentando carregar dashboard admin...');
     const tenants = await prisma.tenant.findMany({
       include: {
         _count: {
@@ -13,9 +15,11 @@ router.get('/', async (req, res) => {
         }
       }
     });
+    console.log(`Sucesso! Encontrados ${tenants.length} tenants.`);
     res.render('admin-dashboard', { tenants });
   } catch (error) {
-    res.status(500).send('Erro ao carregar dashboard');
+    console.error('ERRO FATAL AO CARREGAR DASHBOARD:', error);
+    res.status(500).send(`Erro ao carregar dashboard: ${error.message}`);
   }
 });
 
@@ -24,12 +28,12 @@ router.post('/tenants', async (req, res) => {
   const { name, email, password, logoUrl, portalTitle } = req.body;
   try {
     await prisma.tenant.create({
-      data: { 
-        name, 
-        email, 
+      data: {
+        name,
+        email,
         password,
         logoUrl,
-        portalTitle: portalTitle || undefined 
+        portalTitle: portalTitle || undefined
       }
     });
     res.redirect('/admin');

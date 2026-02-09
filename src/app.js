@@ -29,6 +29,14 @@ app.get('/', (req, res) => {
   res.send('<h1>Bem-vindo ao SaaS Portal Captive</h1><p><a href="/admin">Ir para Painel Admin</a></p>');
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Servidor rodando na porta ${PORT}`);
+
+  // Teste de conexão com Banco de Dados
+  try {
+    await prisma.$connect();
+    console.log('✅ Banco de dados conectado com sucesso!');
+  } catch (error) {
+    console.error('❌ Erro ao conectar ao banco de dados:', error);
+  }
 });
