@@ -4,7 +4,7 @@
   "description": "SaaS Captive Portal for Routers",
   "main": "src/app.js",
   "scripts": {
-    "start": "node src/app.js",
+    "start": "npx prisma db push && node src/app.js",
     "dev": "nodemon src/app.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push"
