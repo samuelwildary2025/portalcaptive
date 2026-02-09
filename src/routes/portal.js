@@ -15,7 +15,7 @@ router.get('/:tenantId', async (req, res) => {
   console.log('Headers:', req.headers);
   console.log('--------------------------------');
 
-  const { mac, ip, url, login_url, gw_address, gw_port, continue: continueUrl, ap_mac, ssid, redirect_uri } = req.query; 
+  const { mac, ip, url, login_url, gw_address, gw_port, continue: continueUrl, ap_mac, ssid, redirect_uri, user_hash, ts } = req.query; 
 
   try {
     const tenant = await prisma.tenant.findUnique({
@@ -30,8 +30,10 @@ router.get('/:tenantId', async (req, res) => {
       tenant,
       mac,
       ip,
-      originalUrl: url || continueUrl, // Intelbras usa 'continue'
-      loginUrl: login_url || redirect_uri, // Intelbras usa 'redirect_uri'
+      user_hash, // Passando user_hash para a view (Obrigatório para Intelbras)
+      ts,        // Passando timestamp para a view
+      originalUrl: url || continueUrl, 
+      loginUrl: login_url || redirect_uri,
       ssid,
       ap_mac
     });
@@ -44,7 +46,7 @@ router.get('/:tenantId', async (req, res) => {
 // Processar Login
 router.post('/:tenantId/login', async (req, res) => {
   const { tenantId } = req.params;
-  const { mac, email, cpf, whatsapp, loginUrl, originalUrl, ip } = req.body;
+  const { mac, email, cpf, whatsapp, loginUrl, originalUrl, ip, user_hash, ts } = req.body;
 
   try {
     // 1. Cadastrar ou Atualizar Usuário
@@ -80,72 +82,39 @@ router.post('/:tenantId/login', async (req, res) => {
       }
     });
 
-    // 3. Redirecionar para liberar o acesso
-    // Intelbras AP 360 espera POST para itbcaptive.cgi
+    // 3. Redirecionar para liberar o acesso (MÉTODO INTELBRAS - Conforme documentação Zeus OS)
+    // Usar GET redirect para o redirect_uri original com parâmetros na query string
     
     if (loginUrl) {
-       let finalLoginUrl = loginUrl;
-       const ip = req.body.ip;
+       console.log('=== LIBERAÇÃO INTELBRAS ===');
+       console.log('redirect_uri original:', loginUrl);
+       console.log('user_hash:', user_hash);
+       console.log('ts:', ts);
        
-       // TENTATIVA DE CORREÇÃO DE DNS E SSL:
-       // Se tivermos o IP do gateway, vamos forçar o uso dele e HTTP puro.
-       // O AP envia 'ip' na query string (ex: 10.0.0.1).
+       // Construir parâmetros conforme especificação (página 8-9 do PDF)
+       const session_timeout = 3600;  // 1 hora
+       const idle_timeout = 600;      // 10 min ocioso
+       const continueUrl = originalUrl || 'http://www.google.com';
        
-       if (ip) {
-           // Substitui qualquer protocolo e domínio pelo IP do gateway em HTTP
-           // Ex: https://meucaptive.intelbras.com.br:2061/... -> http://10.0.0.1:2061/...
-           
-           try {
-               // Tenta fazer parse da URL original para manter path e query
-               const urlObj = new URL(loginUrl);
-               
-               // Se a URL original for HTTPS, mudamos para HTTP para evitar erro de certificado auto-assinado
-               const protocol = 'http:';
-               
-               // Mantém a porta se existir, senão usa padrão (mas o AP costuma mandar 2061)
-               const port = urlObj.port ? `:${urlObj.port}` : '';
-               
-               // Reconstrói a URL usando o IP
-               finalLoginUrl = `${protocol}//${ip}${port}${urlObj.pathname}${urlObj.search}`;
-               
-               console.log('URL de liberação reescrita (DNS/SSL Fix):', finalLoginUrl);
-           } catch (e) {
-               console.error('Erro ao reescrever URL:', e);
-               // Se der erro no parse, mantém a original
-           }
-       }
+       // Construir URL final com parâmetros (GET redirect, não POST)
+       const params = new URLSearchParams({
+         continue: continueUrl,
+         ts: ts,
+         user_hash: user_hash,
+         session_timeout: session_timeout.toString(),
+         idle_timeout: idle_timeout.toString()
+       });
        
-       console.log('Enviando POST para liberação:', finalLoginUrl);
+       // Usar o redirect_uri ORIGINAL - NÃO reescrever para IP local!
+       // O DNS meucaptive.intelbras.com.br resolve para o IP do roteador na rede do cliente
+       const finalUrl = `${loginUrl}?${params.toString()}`;
        
-       // Renderiza uma página que faz o POST automático, mas com botão de fallback
-       return res.send(`
-         <html>
-           <head>
-             <title>Conectando...</title>
-             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-             <style>
-                body { font-family: sans-serif; text-align: center; padding: 20px; display: flex; flex-direction: column; justify-content: center; height: 100vh; background: #f4f4f4; }
-                .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
-                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 20px; }
-             </style>
-           </head>
-           <body onload="setTimeout(function() { document.getElementById('loginForm').submit(); }, 1000)">
-             <div class="loader"></div>
-             <h3>Quase lá...</h3>
-             <p>Finalizando sua conexão.</p>
-             
-             <form id="loginForm" action="${finalLoginUrl}" method="POST">
-               <input type="hidden" name="username" value="${mac}">
-               <input type="hidden" name="password" value="guest">
-             </form>
-             
-             <p><small>Se não conectar em 5 segundos, clique abaixo:</small></p>
-             <button onclick="document.getElementById('loginForm').submit()">LIBERAR INTERNET</button>
-           </body>
-         </html>
-       `);
-    }
+       console.log('URL final de liberação:', finalUrl);
+       console.log('===========================');
+       
+       // Redirect GET conforme documentação Intelbras
+       return res.redirect(finalUrl);
+     }
     
     // Fallback: mostrar tela de sucesso
     res.render('portal-success', { originalUrl: originalUrl || 'https://google.com' });
